@@ -1,0 +1,47 @@
+version: 2.1
+jobs:
+  build:
+    machine:
+      image: ubuntu-2004:current
+    resource_class: arm.medium
+    environment:
+      - STACK_SRC_VER: 2.9.3
+      - STACK_SRC_URL: https://github.com/commercialhaskell/stack/archive/refs/tags/v2.9.3.tar.gz
+      - STACK_BIN_URL: https://github.com/bjin/stack-aarch64-static/releases/download/v2.9.3-bootstrap/stack-2.9.3-linux-aarch64-static.tar.gz
+      - DOCKER_REPO: bjin/stack-docker-aarch64:9.4.4
+    steps:
+      - checkout
+      - restore_cache:
+          name: Restore Cached Dependencies
+          key: cci-stack-{{ checksum ".circleci/config.yml" }}
+      - run:
+          name: prepare
+          command: |
+            curl -L "$STACK_BIN_URL" | tar xz
+            curl -L "$STACK_SRC_URL" | tar xz
+            docker pull "$DOCKER_REPO"
+      - run:
+          name: build
+          command: |
+            cd stack-*
+            for diff in ../*.patch; do
+                patch -p1 < "$diff"
+            done
+            ../stack --stack-yaml stack-ghc-9.4.3.yaml --system-ghc --no-install-ghc \
+                --docker --docker-repo "$DOCKER_REPO" --docker-stack-exe image \
+                install --flag stack:static --flag stack:-developer-mode --ghc-options -split-sections
+      - run:
+          name: package
+          command: |
+            cd stack-*
+            mkdir ~/release
+            tar czvf ~/release/stack-${STACK_SRC_VER}-linux-aarch64-static.tar.gz -C .stack-work/docker/_home/.local/bin stack
+      - store_artifacts:
+          path: ~/release
+          destination: release
+      - save_cache:
+          name: Cache Dependencies
+          key: cci-stack-{{ checksum ".circleci/config.yml" }}
+          paths:
+            - ~/.stack
+            - .stack-work
