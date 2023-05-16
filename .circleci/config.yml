@@ -7,13 +7,12 @@ jobs:
     environment:
       - STACK_SRC_VER: 2.9.3
       - STACK_SRC_URL: https://github.com/commercialhaskell/stack/archive/refs/tags/v2.9.3.tar.gz
-      - STACK_BIN_URL: https://github.com/bjin/stack-aarch64-static/releases/download/v2.9.3-bootstrap/stack-2.9.3-linux-aarch64-static.tar.gz
-      - DOCKER_REPO: bjin/stack-docker-aarch64:9.4.4
+      - STACK_BIN_URL: https://github.com/bjin/stack-aarch64-static/releases/download/v2.9.3/stack-2.9.3-linux-aarch64-static.tar.gz
+      - DOCKER_REPO: bjin/stack-docker-aarch64:9.4.5
+      - DOCKER_EXE: image
+      - GHC_OPTIONS: --ghc-options -split-sections --ghc-options -O --ghc-options -optc-Os
     steps:
       - checkout
-      - restore_cache:
-          name: Restore Cached Dependencies
-          key: cci-stack-{{ checksum ".circleci/config.yml" }}
       - run:
           name: prepare
           command: |
@@ -23,25 +22,20 @@ jobs:
       - run:
           name: build
           command: |
-            cd stack-*
+            cd "stack-$STACK_SRC_VER"
             for diff in ../*.patch; do
                 patch -p1 < "$diff"
             done
-            ../stack --stack-yaml stack-ghc-9.4.3.yaml --system-ghc --no-install-ghc \
-                --docker --docker-repo "$DOCKER_REPO" --docker-stack-exe image \
-                install --flag stack:static --flag stack:-developer-mode --ghc-options -split-sections
+            ../stack --stack-yaml stack-ghc-9.4.3.yaml \
+                --no-terminal --no-interleaved-output --system-ghc --no-install-ghc \
+                --docker --docker-repo "$DOCKER_REPO" --docker-stack-exe "$DOCKER_EXE" \
+                install --flag stack:static --flag stack:-developer-mode $GHC_OPTIONS
       - run:
           name: package
           command: |
-            cd stack-*
+            cd "stack-$STACK_SRC_VER"
             mkdir ~/release
             tar czvf ~/release/stack-${STACK_SRC_VER}-linux-aarch64-static.tar.gz -C .stack-work/docker/_home/.local/bin stack
       - store_artifacts:
           path: ~/release
           destination: release
-      - save_cache:
-          name: Cache Dependencies
-          key: cci-stack-{{ checksum ".circleci/config.yml" }}
-          paths:
-            - ~/.stack
-            - .stack-work
