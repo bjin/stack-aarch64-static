@@ -9,6 +9,7 @@ jobs:
       - STACK_BIN_URL: https://github.com/bjin/stack-aarch64-static/releases/download/v2.9.3-2/stack-2.9.3-linux-aarch64-static.tar.gz
       - DOCKER_REPO: bjin/stack-docker-aarch64:9.4.5
       - DOCKER_EXE: image
+      - STACK_YAML: stack-ghc-9.4.5.yaml
       - GHC_OPTIONS: --ghc-options -split-sections --ghc-options -O --ghc-options -optc-Os
     steps:
       - checkout
@@ -22,7 +23,8 @@ jobs:
           name: build
           command: |
             cd "stack-$STACK_SRC_VER"
-            ../stack --stack-yaml stack-ghc-9.4.5.yaml \
+            echo "apply-ghc-options: everything" >> "$STACK_YAML"
+            ../stack --stack-yaml "$STACK_YAML" \
                 --no-terminal --no-interleaved-output --system-ghc --no-install-ghc \
                 --docker --docker-repo "$DOCKER_REPO" --docker-stack-exe "$DOCKER_EXE" \
                 install --flag stack:static --flag stack:-developer-mode $GHC_OPTIONS
